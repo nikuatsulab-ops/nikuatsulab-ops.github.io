@@ -1,0 +1,1 @@
+{"background_color":"#f5efe5","description":"家具を自由に配置する2Dスローライフゲーム試作品","display":"standalone","icons":[{"sizes":"192x192","src":"./icon-192.png","type":"image/png"},{"sizes":"512x512","src":"./icon-512.png","type":"image/png"}],"name":"Little Living Town - Prototype","scope":"./","short_name":"Little Town","start_url":"./index.html","theme_color":"#f5efe5"}
