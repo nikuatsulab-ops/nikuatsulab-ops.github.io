@@ -4,10 +4,7 @@ var ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
-  './icon.svg',
-  './apple-touch-icon.png',
-  './icon-192.png',
-  './icon-512.png'
+  './icon.svg'
 ];
 self.addEventListener('install', function (e) {
   e.waitUntil(
