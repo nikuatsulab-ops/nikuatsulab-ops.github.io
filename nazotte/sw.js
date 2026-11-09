@@ -1,5 +1,5 @@
 'use strict';
-var CACHE = 'nazotte-v1.3';
+var CACHE = 'nazotte-v1.4';
 var ASSETS = [
   './',
   './index.html',
