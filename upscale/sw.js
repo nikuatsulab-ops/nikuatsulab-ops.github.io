@@ -1,4 +1,4 @@
-var CACHE = 'upscale-test-v1';
+var CACHE = 'upscale-test-v2';
 var ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', function (e) {
@@ -17,7 +17,23 @@ self.addEventListener('activate', function (e) {
 
 self.addEventListener('fetch', function (e) {
   var url = new URL(e.request.url);
-  if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (e.request.method !== 'GET') return;
+  // Inference library (CDN): cache-first so repeat use works fully offline.
+  if (url.hostname === 'cdn.jsdelivr.net') {
+    e.respondWith(
+      caches.open(CACHE).then(function (c) {
+        return c.match(e.request).then(function (hit) {
+          if (hit) return hit;
+          return fetch(e.request).then(function (res) {
+            try { c.put(e.request, res.clone()); } catch (err) {}
+            return res;
+          });
+        });
+      })
+    );
+    return;
+  }
+  if (url.origin !== self.location.origin) return;
   if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request).then(function (res) {
