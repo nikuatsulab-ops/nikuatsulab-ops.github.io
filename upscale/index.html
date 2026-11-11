@@ -185,8 +185,11 @@ $('run').addEventListener('click',async()=>{
     }
     octx.globalAlpha=1;
     }else{backend='通常拡大のみ';$('backend').textContent=backend;setBar(1);log('AI 0%のため、通常の拡大だけで処理しました。')}
-    const secs=((performance.now()-t0)/1000).toFixed(1);
+    let secs=((performance.now()-t0)/1000).toFixed(1);
+    log('画像を仕上げています……');
     out.toBlob(b=>{
+      secs=((performance.now()-t0)/1000).toFixed(1);
+      $('elapsed').textContent=secs+'秒';
       resultBlob=b;
       if(resultURL)URL.revokeObjectURL(resultURL);
       resultURL=URL.createObjectURL(b);
