@@ -55,6 +55,9 @@ footer{border-top:1px solid var(--line);color:var(--sub);font-size:11.5px}
 <button id="scale4" aria-pressed="false">4倍</button>
 </div>
 <p class="sub">AIは4倍で生成し、2倍では縮小して整えます（画質優先の方法です）。</p>
+<label style="display:flex;justify-content:space-between;font-size:13.5px;font-weight:700;margin-top:14px"><span>AIの補完の強さ</span><span id="aiVal">50%</span></label>
+<input id="aiLevel" type="range" min="0" max="100" step="5" value="50" style="width:100%">
+<p class="sub">弱くすると元の質感に忠実に、強くすると線や細部をしっかり補完します。服の質感が暴れるときは 50% 前後がおすすめです。0%ではAIを使わず、通常の拡大だけになります。</p>
 </section>
 <section class="card">
 <h2>3. 拡大する</h2>
@@ -77,7 +80,7 @@ footer{border-top:1px solid var(--line);color:var(--sub);font-size:11.5px}
 <p class="sub">処理は、すべてこの端末の中で行います。画像が外部へ送られることはありません（初回のモデル等のダウンロードを除きます）。成人向け作品でも、そのまま使えます。<br>モデル：Real-ESRGAN x4plus anime 6B（イラスト向け、BSD-3-Clause）。<br><span class="warn">試験版です。大きな画像ではメモリ不足で落ちる可能性があります。まず普段のサイズの画像で試してください。</span></p>
 </section>
 </main>
-<footer><div class="wrap"><span>試験版 v0.2 · 端末内処理のみ</span></div></footer>
+<footer><div class="wrap"><span>試験版 v0.3 · 端末内処理のみ</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.webgpu.min.js"></script>
 <script>
 'use strict';
@@ -86,7 +89,7 @@ const CDN='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
 const MODEL_URL='https://huggingface.co/zelda9/persona-models/resolve/main/upscale/realesrgan-x4plus-anime-6b.onnx';
 const MODEL_SHA='2648cab4c4343541c1aa291c6754e9e8edbe7a813fffc2a677423dd12cb6b7f7';
 const MODEL_BYTES=17906556, TILE=128, PAD=16;
-let scaleOut=2, session=null, backend='', busy=false, resultBlob=null, resultURL=null, baseName='image';
+let scaleOut=2, aiLevel=50, session=null, backend='', busy=false, resultBlob=null, resultURL=null, baseName='image';
 const srcCanvas=document.createElement('canvas');
 function log(m){$('log').textContent=m}
 function setBar(f){$('barFill').style.width=Math.round(Math.max(0,Math.min(1,f))*100)+'%'}
@@ -94,6 +97,7 @@ if(typeof ort!=='undefined'){ort.env.wasm.wasmPaths=CDN;ort.env.wasm.numThreads=
 function pickScale(v,btn){scaleOut=v;document.querySelectorAll('[id^="scale"]').forEach(b=>{b.classList.toggle('active',b===btn);b.setAttribute('aria-pressed',b===btn)})}
 $('scale2').onclick=()=>pickScale(2,$('scale2'));
 $('scale4').onclick=()=>pickScale(4,$('scale4'));
+$('aiLevel').addEventListener('input',()=>{aiLevel=+$('aiLevel').value;$('aiVal').textContent=aiLevel+'%'});
 $('file').addEventListener('change',()=>{
   const f=$('file').files[0]; if(!f)return;
   baseName=(f.name||'image').replace(/\.[^.]+$/,'')||'image';
@@ -143,14 +147,19 @@ $('run').addEventListener('click',async()=>{
   const t0=performance.now();
   const timer=setInterval(()=>{$('elapsed').textContent=((performance.now()-t0)/1000).toFixed(1)+'秒'},200);
   try{
-    const sess=await getSession();
+    const strength=aiLevel/100;
     const W=srcCanvas.width,H=srcCanvas.height;
     const out=document.createElement('canvas'); out.width=W*scaleOut; out.height=H*scaleOut;
     const octx=out.getContext('2d');
+    octx.imageSmoothingEnabled=true; octx.imageSmoothingQuality='high';
+    octx.drawImage(srcCanvas,0,0,out.width,out.height);
+    if(strength>0){
+    const sess=await getSession();
     const full=srcCanvas.getContext('2d').getImageData(0,0,W,H);
     const total=Math.ceil(W/TILE)*Math.ceil(H/TILE); let done=0;
     const tileCanvas=document.createElement('canvas'); const tctx=tileCanvas.getContext('2d');
     const inName=sess.inputNames[0], outName=sess.outputNames[0];
+    octx.globalAlpha=strength;
     for(let ty=0;ty<H;ty+=TILE)for(let tx=0;tx<W;tx+=TILE){
       const x0=Math.max(0,tx-PAD),y0=Math.max(0,ty-PAD),x1=Math.min(W,tx+TILE+PAD),y1=Math.min(H,ty+TILE+PAD);
       const pw=x1-x0,ph=y1-y0,plane=pw*ph;
@@ -174,13 +183,15 @@ $('run').addEventListener('click',async()=>{
       done++; setBar(0.5+0.5*done/total); log(`拡大中…… ${done} / ${total} タイル（${backend}）`);
       await new Promise(r=>setTimeout(r,0));
     }
+    octx.globalAlpha=1;
+    }else{backend='通常拡大のみ';$('backend').textContent=backend;setBar(1);log('AI 0%のため、通常の拡大だけで処理しました。')}
     const secs=((performance.now()-t0)/1000).toFixed(1);
     out.toBlob(b=>{
       resultBlob=b;
       if(resultURL)URL.revokeObjectURL(resultURL);
       resultURL=URL.createObjectURL(b);
       $('preview').src=resultURL; $('preview').style.display='block';
-      $('resultInfo').textContent=`${W} × ${H}px → ${out.width} × ${out.height}px（${scaleOut}倍）／ ${secs}秒 ／ ${backend}`;
+      $('resultInfo').textContent=`${W} × ${H}px → ${out.width} × ${out.height}px（${scaleOut}倍・AI ${aiLevel}%）／ ${secs}秒 ／ ${backend}`;
       $('resultCard').style.display='block';
       setBar(1); log(`完了しました。${secs}秒かかりました。`);
       busy=false; $('run').disabled=false; $('run').textContent='もう一度拡大する';
@@ -192,12 +203,12 @@ $('run').addEventListener('click',async()=>{
 });
 $('save').addEventListener('click',()=>{
   if(!resultBlob)return;
-  const a=document.createElement('a'); a.href=resultURL; a.download=baseName+'_x'+scaleOut+'.png';
+  const a=document.createElement('a'); a.href=resultURL; a.download=baseName+'_x'+scaleOut+'_ai'+aiLevel+'.png';
   document.body.appendChild(a); a.click(); a.remove();
 });
 $('share').addEventListener('click',async()=>{
   if(!resultBlob)return;
-  const file=new File([resultBlob],baseName+'_x'+scaleOut+'.png',{type:'image/png'});
+  const file=new File([resultBlob],baseName+'_x'+scaleOut+'_ai'+aiLevel+'.png',{type:'image/png'});
   if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]})}catch(e){}}
   else log('このブラウザでは共有に対応していないため、「保存する」を使ってください。');
 });

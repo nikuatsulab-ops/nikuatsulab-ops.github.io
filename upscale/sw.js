@@ -1,4 +1,4 @@
-var CACHE = 'upscale-test-v3';
+var CACHE = 'upscale-test-v4';
 var ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './apple-touch-icon 2.png', './icon-192 2.png', './icon-512 2.png'];
 
 self.addEventListener('install', function (e) {
